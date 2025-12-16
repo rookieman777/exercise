@@ -66,6 +66,11 @@ func InitDatabase() error {
 	return nil
 }
 
+// GetDB 获取数据库连接实例
+func GetDB() *gorm.DB {
+	return DB
+}
+
 // CloseDatabase 关闭数据库连接
 func CloseDatabase() error {
 	if DB == nil {
