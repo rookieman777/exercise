@@ -6,12 +6,13 @@ import (
 	"exercise/database"
 	"fmt"
 	"log"
+
 	//"os"
 	//"strings"
 	//"time"
 	//"exercise/databse"
-	//"exercise/models"
-	//"exercise/services"
+	"exercise/models"
+	"exercise/services"
 	//"gorm.io/gorm"
 )
 
@@ -42,10 +43,10 @@ func main() {
 	fmt.Println("\n✅ 数据库连接成功，开始演示...")
 
 	// 创建服务实例
-	//userService := services.NewUserService()
+	userService := services.NewUserService()
 
 	// 演示1：基本CRUD操作
-	//demoBasicCRUD(userService)
+	demoBasicCRUD(userService)
 
 	// 演示2：关联关系和查询
 	//demoAssociations()
@@ -60,4 +61,25 @@ func main() {
 	//demoPerformanceTips()
 
 	fmt.Println("\n🎉 演示完成！")
+}
+
+func demoBasicCRUD(service services.UserService) {
+	fmt.Println("\n1️⃣ 基本CRUD操作演示")
+	fmt.Println("----------------")
+
+	// 1.1 创建用户
+	user1 := &models.User{
+		Username: "john_doe",
+		Email:    "john@example.com",
+		Password: "SecurePass123",
+		Age:      25,
+		IsActive: true,
+	}
+
+	fmt.Println("\n📝 创建用户:")
+	if err := service.Register(user1); err != nil {
+		log.Printf("创建用户失败: %v", err)
+	} else {
+		fmt.Printf("✅ 用户创建成功: %s (ID: %d)\n", user1.Username, user1.ID)
+	}
 }
