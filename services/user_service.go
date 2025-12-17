@@ -26,10 +26,10 @@ var (
 type UserService interface {
 	Register(user *models.User) error
 	// Login(email, password string) (*models.User, error)
-	// GetUserByID(id uint) (*models.User, error)
+	GetUserByID(id uint) (*models.User, error)
 	// UpdateProfile(id uint, profile *models.Profile) error
-	// DeactivateAccount(id uint) error
-	// SearchUsers(keyword string, page, pageSize int) ([]models.User, int64, error)
+	DeactivateAccount(id uint) error
+	SearchUsers(keyword string, page, pageSize int) ([]models.User, int64, error)
 	// GetUserStats() (*UserStats, error)
 	// ExportUsers() ([]byte, error)
 	// ImportUsers(data []byte) (int, error)
@@ -79,4 +79,48 @@ func (s *userServiceImpl) Register(user *models.User) error {
 
 	// 创建用户（自动创建关联profile）
 	return s.userRepo.Create(user)
+}
+
+// GetUserByID 获取用户详情（包含关联数据）
+func (s *userServiceImpl) GetUserByID(id uint) (*models.User, error) {
+	user, err := s.userRepo.FindByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, fmt.Errorf("获取用户失败: %v", err)
+	}
+
+	// TODO: 获取用户的文章和评论统计（需要在User模型中添加Extra字段）
+	// postCount, commentCount, err := s.getUserActivityStats(id)
+	// if err != nil {
+	// 	log.Printf("获取用户活动统计失败: %v", err)
+	// }
+	//
+	// user.Extra = map[string]interface{}{
+	// 	"post_count":    postCount,
+	// 	"comment_count": commentCount,
+	// }
+
+	return user, nil
+}
+
+// DeactivateAccount 停用账户（软删除）
+func (s *userServiceImpl) DeactivateAccount(id uint) error {
+	// 停用用户
+	user, err := s.userRepo.FindByID(id)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	user.IsActive = false
+	// TODO: 添加DeactivatedAt字段到User模型
+	// user.DeactivatedAt = time.Now()
+
+	return s.userRepo.Update(user)
+}
+
+// SearchUsers 搜索用户（分页）
+func (s *userServiceImpl) SearchUsers(keyword string, page, pageSize int) ([]models.User, int64, error) {
+	return s.userRepo.Search(keyword, page, pageSize)
 }

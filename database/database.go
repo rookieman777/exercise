@@ -12,8 +12,10 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// DB 全局数据库连接实例
 var DB *gorm.DB
 
+// InitDatabase 初始化数据库连接
 func InitDatabase() error {
 	// 加载配置
 	cfg, err := config.LoadConfig()

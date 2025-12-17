@@ -82,4 +82,49 @@ func demoBasicCRUD(service services.UserService) {
 	} else {
 		fmt.Printf("✅ 用户创建成功: %s (ID: %d)\n", user1.Username, user1.ID)
 	}
+
+	// 1.2 查询用户
+	fmt.Println("\n🔍 查询用户:")
+	fetchedUser, err := service.GetUserByID(user1.ID)
+	if err != nil {
+		log.Printf("查询用户失败: %v", err)
+	} else {
+		fmt.Printf("✅ 查询到用户: %s (邮箱: %s)\n", fetchedUser.Username, fetchedUser.Email)
+	}
+
+	// 1.3 更新用户 //这个功能没有使用接口，直接连接数据库了
+	fmt.Println("\n✏️ 更新用户:")
+	user1.Age = 26
+	user1.Email = "john.updated@example.com"
+	// 使用数据库直接更新
+	db := database.GetDB()
+	if err := db.Model(user1).Updates(map[string]interface{}{
+		"age":   user1.Age,
+		"email": user1.Email,
+	}).Error; err != nil {
+		log.Printf("更新用户失败: %v", err)
+	} else {
+		fmt.Printf("✅ 用户更新成功: 年龄更新为 %d\n", user1.Age)
+	}
+
+	// 1.4 软删除用户
+	fmt.Println("\n🗑️ 软删除用户:")
+	if err := service.DeactivateAccount(user1.ID); err != nil {
+		log.Printf("删除用户失败: %v", err)
+	} else {
+		fmt.Println("✅ 用户已软删除（停用）")
+	}
+
+	// 1.5 分页查询
+	fmt.Println("\n📄 分页查询演示:")
+	users, total, err := service.SearchUsers("", 1, 10)
+	if err != nil {
+		log.Printf("分页查询失败: %v", err)
+	} else {
+		fmt.Printf("✅ 分页查询结果: 第1页，每页10条，共%d条记录\n", total)
+		for _, u := range users {
+			fmt.Printf("   - %s (%s)\n", u.Username, u.Email)
+		}
+	}
+
 }
