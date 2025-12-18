@@ -13,7 +13,8 @@ import (
 	//"exercise/databse"
 	"exercise/models"
 	"exercise/services"
-	//"gorm.io/gorm"
+
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 	demoBasicCRUD(userService)
 
 	// 演示2：关联关系和查询
-	//demoAssociations()
+	demoAssociations()
 
 	// 演示3：事务管理
 	//demoTransactions()
@@ -127,4 +128,91 @@ func demoBasicCRUD(service services.UserService) {
 		}
 	}
 
+}
+
+// demoAssociations 演示关联关系和查询
+func demoAssociations() {
+	fmt.Println("\n2️⃣ 关联关系演示")
+	fmt.Println("--------------")
+
+	db := database.GetDB()
+
+	// 2.1 创建具有关联数据的用户
+	fmt.Println("\n🤝 创建带关联数据的用户:")
+	user := &models.User{
+		Username: "alice_smith",
+		Email:    "alice@example.com",
+		Password: "AlicePass456",
+		Age:      30,
+		Profile: &models.Profile{
+			FirstName: "Alice",
+			LastName:  "Smith",
+			Bio:       "Software Engineer",
+			Location:  "San Francisco",
+		},
+		Posts: []models.Post{
+			{
+				Title:   "我的第一篇博客",
+				Content: "这是Alice的第一篇博客内容...",
+				Slug:    "my-first-post",
+				Status:  "published",
+			},
+		},
+	}
+
+	// 使用事务创建关联数据
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(user).Error; err != nil {
+			return fmt.Errorf("创建用户失败: %v", err)
+		}
+		fmt.Printf("✅ 用户创建成功: ID=%d\n", user.ID)
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("创建关联数据失败: %v", err)
+		return
+	}
+
+	// 2.2 预加载关联数据
+	fmt.Println("\n🔍 预加载关联数据:")
+	var loadedUser models.User
+	err = db.Preload("Profile").Preload("Posts").Preload("Posts.Comments").First(&loadedUser, user.ID).Error
+	if err != nil {
+		log.Printf("预加载失败: %v", err)
+	} else {
+		fmt.Printf("✅ 用户: %s\n", loadedUser.Username)
+		if loadedUser.Profile != nil {
+			fmt.Printf("   📝 资料: %s %s - %s\n",
+				loadedUser.Profile.FirstName, loadedUser.Profile.LastName,
+				loadedUser.Profile.Location)
+		}
+		fmt.Printf("   📰 文章数: %d\n", len(loadedUser.Posts))
+	}
+
+	// 2.3 关联查询
+	fmt.Println("\n🔗 关联查询:")
+	type UserWithPostCount struct {
+		ID        uint
+		Username  string
+		Email     string
+		PostCount int
+	}
+
+	var usersWithPosts []UserWithPostCount
+	err = db.Model(&models.User{}).
+		Select("users.id, users.username, users.email, COUNT(posts.id) as post_count").
+		Joins("LEFT JOIN posts ON posts.author_id = users.id").
+		Group("users.id").
+		Having("post_count > 0").
+		Find(&usersWithPosts).Error
+
+	if err != nil {
+		log.Printf("关联查询失败: %v", err)
+	} else {
+		fmt.Println("✅ 用户及其文章数统计:")
+		for _, u := range usersWithPosts {
+			fmt.Printf("   - %s: %d 篇文章\n", u.Username, u.PostCount)
+		}
+	}
 }
