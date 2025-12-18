@@ -53,7 +53,7 @@ func main() {
 	demoAssociations()
 
 	// 演示3：事务管理
-	//demoTransactions()
+	demoTransactions()
 
 	// 演示4：高级查询和统计
 	//demoAdvancedQueries(userService)
@@ -215,4 +215,125 @@ func demoAssociations() {
 			fmt.Printf("   - %s: %d 篇文章\n", u.Username, u.PostCount)
 		}
 	}
+}
+
+// demoTransactions 演示事务管理
+func demoTransactions() {
+	fmt.Println("\n3️⃣ 事务管理演示")
+	fmt.Println("--------------")
+
+	db := database.GetDB()
+
+	// 3.1 简单事务示例
+	fmt.Println("\n🔁 简单事务:")
+	err := db.Transaction(func(tx *gorm.DB) error {
+		// 操作1：创建用户
+		user := &models.User{
+			Username: "bob_jones",
+			Email:    "bob@example.com",
+			Password: "BobPass789",
+			Age:      35,
+		}
+		if err := tx.Create(user).Error; err != nil {
+			return fmt.Errorf("创建用户失败: %v", err)
+		}
+		fmt.Printf("✅ 步骤1: 用户创建成功 (ID: %d)\n", user.ID)
+
+		// 操作2：创建用户资料
+		profile := &models.Profile{
+			UserID:    user.ID,
+			FirstName: "Bob",
+			LastName:  "Jones",
+			Bio:       "Database Administrator",
+		}
+		if err := tx.Create(profile).Error; err != nil {
+			return fmt.Errorf("创建资料失败: %v", err)
+		}
+		fmt.Printf("✅ 步骤2: 用户资料创建成功\n")
+
+		// 操作3：创建文章
+		post := &models.Post{
+			AuthorID: user.ID,
+			Title:    "数据库优化技巧",
+			Content:  "分享一些数据库性能优化的实践经验...",
+			Slug:     "database-optimization",
+			Status:   "published",
+		}
+		if err := tx.Create(post).Error; err != nil {
+			return fmt.Errorf("创建文章失败: %v", err)
+		}
+		fmt.Printf("✅ 步骤3: 文章创建成功\n")
+
+		return nil // 提交事务
+	})
+
+	if err != nil {
+		log.Printf("事务执行失败: %v", err)
+	} else {
+		fmt.Println("🎉 所有操作已成功提交")
+	}
+
+	// 3.2 嵌套事务示例，内层回滚不影响外层
+	fmt.Println("\n🔁 嵌套事务:")
+	err = db.Transaction(func(tx *gorm.DB) error {
+		// 外层事务
+		user := &models.User{
+			Username: "carol_wilson",
+			Email:    "carol@example.com",
+			Password: "CarolPass101",
+			Age:      28,
+		}
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		fmt.Printf("✅ 外层事务: 用户创建成功\n")
+
+		// 嵌套事务（保存点）
+		nestedErr := tx.Transaction(func(tx2 *gorm.DB) error {
+			// 内层事务操作
+			profile := &models.Profile{
+				UserID:    user.ID,
+				FirstName: "Carol",
+				LastName:  "Wilson",
+			}
+			if err := tx2.Create(profile).Error; err != nil {
+				return err
+			}
+			fmt.Printf("✅ 内层事务: 资料创建成功\n")
+
+			// 模拟一个可能失败的操作
+			var count int64
+			if err := tx2.Model(&models.User{}).Where("email = ?", "nonexistent@example.com").Count(&count).Error; err != nil {
+				fmt.Println("⚠️ 内层事务: 查询失败（预期行为）")
+				return err // 这将回滚内层事务但不影响外层
+			}
+
+			return nil
+		})
+
+		if nestedErr != nil {
+			fmt.Printf("⚠️ 内层事务已回滚，但外层事务继续执行\n")
+		}
+
+		// 外层事务继续执行其他操作
+		post := &models.Post{
+			AuthorID: user.ID,
+			Title:    "嵌套事务示例",
+			Content:  "这是一个嵌套事务的演示...",
+			Status:   "draft",
+		}
+		if err := tx.Create(post).Error; err != nil {
+			return err
+		}
+		fmt.Printf("✅ 外层事务: 文章创建成功\n")
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("嵌套事务失败: %v", err)
+	} else {
+		fmt.Println("🎉 嵌套事务执行完成")
+	}
+
 }
