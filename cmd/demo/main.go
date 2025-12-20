@@ -1,16 +1,15 @@
 package main
 
 import (
-	//"encoding/json"
-	//"errors"
-	"exercise/database"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
-
-	//"os"
-	//"strings"
+	"os"
+	"strings"
 	"time"
-	//"exercise/databse"
+
+	"exercise/database"
 	"exercise/models"
 	"exercise/services"
 
@@ -56,10 +55,10 @@ func main() {
 	demoTransactions()
 
 	// 演示4：高级查询和统计
-	//demoAdvancedQueries(userService)
+	demoAdvancedQueries(userService)
 
 	// 演示5：性能优化技巧
-	//demoPerformanceTips()
+	demoPerformanceTips()
 
 	fmt.Println("\n🎉 演示完成！")
 }
@@ -491,5 +490,108 @@ func demoPerformanceTips() {
 	} else {
 		duration := time.Since(startTime)
 		fmt.Printf("✅ 索引查询完成，耗时: %v，查询到 %d 条记录\n", duration, len(indexedUsers))
+	}
+}
+
+// demoErrorHandling 演示错误处理
+func demoErrorHandling() {
+	fmt.Println("\n⚠️ 错误处理演示")
+	fmt.Println("---------------")
+
+	db := database.GetDB()
+
+	// 6.1 GORM错误类型
+	fmt.Println("\n🔍 GORM错误类型:")
+	var user models.User
+	err := db.Where("id = ?", 999999).First(&user).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			fmt.Println("✅ 正确处理: 记录不存在")
+		} else if strings.Contains(err.Error(), "connection") {
+			fmt.Println("⚠️ 连接错误")
+		} else {
+			fmt.Printf("❌ 其他错误: %v\n", err)
+		}
+	}
+
+	// 6.2 事务错误处理
+	fmt.Println("\n🔍 事务错误处理:")
+	err = db.Transaction(func(tx *gorm.DB) error {
+		// 尝试创建重复数据
+		dupUser := &models.User{
+			Username: "john_doe", // 已存在
+			Email:    "duplicate@example.com",
+			Password: "Pass123",
+		}
+		if err := tx.Create(dupUser).Error; err != nil {
+			fmt.Printf("✅ 事务捕获错误: %v\n", err)
+			return err // 回滚事务
+		}
+		return nil
+	})
+
+	if err != nil {
+		fmt.Printf("✅ 事务已回滚: %v\n", err)
+	}
+}
+
+// demoHooks 演示钩子和回调
+func demoHooks() {
+	fmt.Println("\n🔔 钩子(Hooks)演示")
+	fmt.Println("---------------")
+
+	// 注意: 钩子在models/user.go中定义
+	fmt.Println("1. BeforeCreate - 创建前自动设置年龄默认值")
+	fmt.Println("2. AfterCreate - 创建后自动创建Profile")
+	fmt.Println("3. BeforeUpdate - 更新前记录日志")
+	fmt.Println("\n✅ 钩子已定义在models/user.go中")
+}
+
+// 导出演示报告
+func generateReport(){
+	//创建报告结构
+	report := map[string]interface{}{
+		"timestamp": time.Now().Format(time.RFC3339),
+		"demonstrations": []string{
+			"基本CRUD操作",
+			"关联关系查询",
+			"事务管理",
+			"高级查询统计",
+			"性能优化",
+			"错误处理",
+			"钩子(Hooks)",
+		},
+		"best_practices": []string{
+			"使用连接池提高性能",
+			"批量操作减少数据库请求",
+			"正确使用事务确保数据一致性",
+			"预加载关联数据避免N+1查询",
+			"合理使用索引优化查询速度",
+			"及时关闭数据库连接",
+			"编写可读的查询语句",
+		},
+		"learning_outcomes": []string{
+			"掌握了 GORM 的基本 CRUD 操作",
+			"理解了关联关系的定义和使用",
+			"学会了使用事务确保数据完整性",
+			"掌握了查询优化技巧",
+			"了解了错误处理的最佳实践",
+			"学会了如何使用钩子扩展功能",
+		},
+	}
+
+	// 导出为 JSON
+	jsonData, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		log.Printf("生成报告失败: %v", err)
+		return
+	}
+
+	filename := fmt.Sprintf("gorm_demo_report_%s.json", time.Now().Format("20060102_150405"))
+	if err := os.WriteFile(filename, jsonData, 0644); err != nil {
+		log.Printf("保存报告失败: %v", err)
+	} else {
+		fmt.Printf("\n📋 演示报告已生成: %s\n", filename)
 	}
 }

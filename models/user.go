@@ -23,3 +23,31 @@ type User struct {
 	Posts   []Post   `gorm:"foreignKey:AuthorID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL" json:"posts,omitempty"`
 	Courses []Course `gorm:"many2many:user_courses;" json:"courses,omitempty"`
 }
+
+// TableName 自定义表名
+func (User) TableName() string {
+	return "users"
+}
+
+// BeforeCreate 创建前的钩子
+func (u *User) BeforeCreate(tx *gorm.DB) error {
+	// 示例：创建前自动设置默认值或验证
+	if u.Age == 0 {
+		u.Age = 18
+	}
+	return nil
+}
+
+// AfterCreate 创建后的钩子
+func (u *User) AfterCreate(tx *gorm.DB) error {
+	// 示例：创建后的钩子（已禁用自动创建Profile，避免重复插入）
+	// 如需自动创建Profile，请在业务代码中手动处理
+	return nil
+}
+
+// BeforeUpdate 更新前的钩子
+func (u *User) BeforeUpdate(tx *gorm.DB) error {
+	// 示例：更新前记录变更日志
+	// log.Printf("更新用户: %s (ID: %d)", u.Username, u.ID)
+	return nil
+}
