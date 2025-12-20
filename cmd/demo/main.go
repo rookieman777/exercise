@@ -414,3 +414,82 @@ func demoAdvancedQueries(service services.UserService) {
 		}
 	}
 }
+
+// demoPerformanceTips 演示性能优化技巧
+func demoPerformanceTips() {
+	fmt.Println("\n5️⃣ 性能优化技巧")
+	fmt.Println("----------------")
+
+	db := database.GetDB()
+
+	// 5.1 查询优化：只选择需要的字段
+	fmt.Println("\n🔍 查询优化 - 只选择需要的字段:")
+	type MinimalUser struct {
+		ID       uint
+		Username string
+		Email    string
+	}
+
+	var minimalUsers []MinimalUser
+	err := db.Model(&models.User{}).
+		Select("id, username, email").
+		Limit(5).
+		Find(&minimalUsers).Error
+
+	if err != nil {
+		log.Printf("查询优化失败: %v", err)
+	} else {
+		fmt.Println("✅ 只查询必要字段，减少数据传输")
+		for _, u := range minimalUsers {
+			fmt.Printf("   - %s (%s)\n", u.Username, u.Email)
+		}
+	}
+
+	// 5.2 批量操作
+	fmt.Println("\n📦 批量操作优化:")
+	users := []models.User{}
+	for i := 1; i <= 5; i++ {
+		users = append(users, models.User{
+			Username: fmt.Sprintf("bulk_user_%d", i),
+			Email:    fmt.Sprintf("bulk%d@example.com", i),
+			Password: "BulkPass123",
+			Age:      20 + i,
+		})
+	}
+
+	// 批量创建
+	if err := db.CreateInBatches(users, 3).Error; err != nil {
+		log.Printf("批量创建失败: %v", err)
+	} else {
+		fmt.Println("✅ 批量创建成功（分批处理，每批3条）")
+	}
+
+	// 5.3 连接池监控
+	fmt.Println("\n📊 连接池状态:")
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Printf("获取连接池失败: %v", err)
+	} else {
+		stats := sqlDB.Stats()
+		fmt.Printf("✅ 连接池状态:\n")
+		fmt.Printf("   最大连接数: %d\n", stats.MaxOpenConnections)
+		fmt.Printf("   打开连接: %d\n", stats.OpenConnections)
+		fmt.Printf("   正在使用: %d\n", stats.InUse)
+		fmt.Printf("   空闲连接: %d\n", stats.Idle)
+	}
+
+	// 5.4 索引使用演示
+	fmt.Println("\n🔍 索引使用演示:")
+	// 查询使用索引的字段
+	var indexedUsers []models.User
+	startTime := time.Now()
+	err = db.Where("username LIKE ?", "bulk%").
+		Find(&indexedUsers).Error
+	if err != nil {
+		log.Printf("索引查询失败: %v", err)
+	} else {
+		duration := time.Since(startTime)
+		fmt.Printf("✅ 索引查询完成，耗时: %v，查询到 %d 条记录\n", duration, len(indexedUsers))
+	}
+}
