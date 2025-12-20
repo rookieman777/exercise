@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	//"log"
-	//"time"
+	"time"
 
 	"exercise/models"
 	"exercise/repositories"
@@ -30,7 +30,7 @@ type UserService interface {
 	// UpdateProfile(id uint, profile *models.Profile) error
 	DeactivateAccount(id uint) error
 	SearchUsers(keyword string, page, pageSize int) ([]models.User, int64, error)
-	// GetUserStats() (*UserStats, error)
+	GetUserStats() (*UserStats, error)
 	// ExportUsers() ([]byte, error)
 	// ImportUsers(data []byte) (int, error)
 }
@@ -123,4 +123,37 @@ func (s *userServiceImpl) DeactivateAccount(id uint) error {
 // SearchUsers 搜索用户（分页）
 func (s *userServiceImpl) SearchUsers(keyword string, page, pageSize int) ([]models.User, int64, error) {
 	return s.userRepo.Search(keyword, page, pageSize)
+}
+
+// GetUserStats 获取用户统计信息
+func (s *userServiceImpl) GetUserStats() (*UserStats, error) {
+	var stats UserStats
+
+	// 获取所有用户进行统计
+	users, _, err := s.userRepo.FindAll(1, 1000000)
+	if err != nil {
+		return nil, fmt.Errorf("获取用户数据失败: %v", err)
+	}
+
+	stats.TotalUsers = int64(len(users))
+	var totalAge int
+	for _, user := range users {
+		if user.IsActive {
+			stats.ActiveUsers++
+		} else {
+			stats.InactiveUsers++
+		}
+		totalAge += user.Age
+
+		// 统计今日注册
+		if user.CreatedAt.Format("2006-01-02") == time.Now().Format("2006-01-02") {
+			stats.TodayRegisters++
+		}
+	}
+
+	if stats.TotalUsers > 0 {
+		stats.AvgAge = float64(totalAge) / float64(stats.TotalUsers)
+	}
+
+	return &stats, nil
 }

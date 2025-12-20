@@ -9,7 +9,7 @@ import (
 
 	//"os"
 	//"strings"
-	//"time"
+	"time"
 	//"exercise/databse"
 	"exercise/models"
 	"exercise/services"
@@ -336,4 +336,81 @@ func demoTransactions() {
 		fmt.Println("🎉 嵌套事务执行完成")
 	}
 
+}
+
+// demoAdvancedQueries 演示高级查询和统计
+func demoAdvancedQueries(service services.UserService) {
+	fmt.Println("\n4️⃣ 高级查询和统计")
+	fmt.Println("----------------")
+
+	// 4.1 复杂条件查询
+	fmt.Println("\n🔍 复杂条件查询:")
+	db := database.GetDB()
+
+	type UserStats struct {
+		Status   string
+		AgeGroup string
+		Count    int
+	}
+
+	var stats []UserStats
+	err := db.Model(&models.User{}).
+		Select(`
+			CASE 
+				WHEN is_active = 1 THEN '活跃'
+				ELSE '非活跃'
+			END as status,
+			CASE 
+				WHEN age < 20 THEN '青少年'
+				WHEN age BETWEEN 20 AND 40 THEN '青年'
+				WHEN age BETWEEN 41 AND 60 THEN '中年'
+				ELSE '老年'
+			END as age_group,
+			COUNT(*) as count
+		`).
+		Group("status, age_group").
+		Order("count DESC").
+		Find(&stats).Error
+
+	if err != nil {
+		log.Printf("统计查询失败: %v", err)
+	} else {
+		fmt.Println("✅ 用户统计分组:")
+		for _, s := range stats {
+			fmt.Printf("   - %s | %s: %d人\n", s.Status, s.AgeGroup, s.Count)
+		}
+	}
+
+	// 4.2 原生SQL查询
+	fmt.Println("\n🔍 原生SQL查询:")
+	var activeUserCount int64
+	err = db.Raw(`
+		SELECT COUNT(*) 
+		FROM users 
+		WHERE is_active = 1 
+		AND created_at > ?
+	`, time.Now().AddDate(0, -1, 0)).
+		Scan(&activeUserCount).Error
+
+	if err != nil {
+		log.Printf("原生SQL查询失败: %v", err)
+	} else {
+		fmt.Printf("✅ 最近一个月活跃用户: %d人\n", activeUserCount)
+	}
+
+	// 4.3 统计功能
+	fmt.Println("\n📊 统计功能演示:")
+	statsData, err := service.GetUserStats()
+	if err != nil {
+		log.Printf("获取统计失败: %v", err)
+	} else {
+		fmt.Println("✅ 用户统计数据:")
+		fmt.Printf("   总用户数: %d\n", statsData.TotalUsers)
+		fmt.Printf("   活跃用户: %d\n", statsData.ActiveUsers)
+		fmt.Printf("   今日注册: %d\n", statsData.TodayRegisters)
+		fmt.Printf("   平均年龄: %.2f\n", statsData.AvgAge)
+		if len(statsData.TopDomains) > 0 {
+			fmt.Printf("   常用邮箱域名: %v\n", statsData.TopDomains)
+		}
+	}
 }
