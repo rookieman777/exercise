@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	//"fmt"
+	"fmt"
 
 	"exercise/database"
 	"exercise/models"
@@ -14,12 +14,12 @@ type UserRepository interface {
 	Create(user *models.User) error
 	FindByID(id uint) (*models.User, error)
 	FindByEmail(email string) (*models.User, error)
-	// FindByUsername(username string) (*models.User, error)
+	FindByUsername(username string) (*models.User, error)
 	Update(user *models.User) error
-	// Delete(id uint) error
+	Delete(id uint) error
 	FindAll(page, pageSize int) ([]models.User, int64, error)
 	Search(keyword string, page, pageSize int) ([]models.User, int64, error)
-	// Count() (int64, error)
+	Count() (int64, error)
 }
 
 // userRepository 用户仓储实现
@@ -59,9 +59,24 @@ func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
+// FindByUsername 根据用户名查找用户
+func (r *userRepository) FindByUsername(username string) (*models.User, error) {
+	var user models.User
+	err := r.db.Where("username = ?", username).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 // Update 更新用户
 func (r *userRepository) Update(user *models.User) error {
 	return r.db.Save(user).Error
+}
+
+// Delete 软删除用户
+func (r *userRepository) Delete(id uint) error {
+	return r.db.Delete(&models.User{}, id).Error
 }
 
 // FindAll 分页查找所有用户
@@ -109,4 +124,23 @@ func (r *userRepository) Search(keyword string, page, pageSize int) ([]models.Us
 	}
 
 	return users, total, nil
+}
+
+// Count 统计用户数量
+func (r *userRepository) Count() (int64, error) {
+	var count int64
+	err := r.db.Model(&models.User{}).Count(&count).Error
+	return count, err
+}
+
+// 事务示例：批量创建用户
+func (r *userRepository) BatchCreate(users []models.User) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, user := range users {
+			if err := tx.Create(&user).Error; err != nil {
+				return fmt.Errorf("创建用户失败: %v", err)
+			}
+		}
+		return nil
+	})
 }

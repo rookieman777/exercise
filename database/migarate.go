@@ -53,7 +53,7 @@ func Migrate() error {
 	return nil
 }
 
-// createIndexes 创建额外的索引(还没看)
+// createIndexes 创建额外的索引
 func createIndexes(db *gorm.DB) error {
 	indexes := []struct {
 		table   string
@@ -98,5 +98,85 @@ func createIndexes(db *gorm.DB) error {
 		}
 	}
 
+	return nil
+}
+
+// DropAll 删除所有表（仅用于开发）
+func DropAll() error {
+	db := GetDB()
+	if db == nil {
+		return fmt.Errorf("数据库连接未初始化")
+	}
+
+	log.Println("删除所有表...")
+
+	tables := []interface{}{
+		&models.Comment{},
+		&models.Post{},
+		&models.Course{},
+		&models.Profile{},
+		&models.User{},
+	}
+
+	// 禁用外键约束
+	if err := db.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
+		return fmt.Errorf("禁用外键约束失败: %v", err)
+	}
+
+	for _, table := range tables {
+		if err := db.Migrator().DropTable(table); err != nil {
+			log.Printf("删除表 %T 失败: %v", table, err)
+		} else {
+			log.Printf("🗑️ 表已删除: %T", table)
+		}
+	}
+
+	// 启用外键约束
+	if err := db.Exec("SET FOREIGN_KEY_CHECKS = 1").Error; err != nil {
+		return fmt.Errorf("启用外键约束失败: %v", err)
+	}
+
+	log.Println("✅ 所有表已删除")
+	return nil
+}
+
+// Reset 重置数据库（删除并重新创建）
+func Reset() error {
+	if err := DropAll(); err != nil {
+		return err
+	}
+	return Migrate()
+}
+
+// CheckStatus 检查数据库状态
+func CheckStatus() error {
+	db := GetDB()
+	if db == nil {
+		return fmt.Errorf("数据库连接未初始化")
+	}
+
+	// 检查连接
+	var result int
+	if err := db.Raw("SELECT 1").Scan(&result).Error; err != nil {
+		return fmt.Errorf("数据库连接检查失败: %v", err)
+	}
+
+	// 检查表状态
+	tables := []string{"users", "profiles", "posts", "comments", "courses"}
+	for _, table := range tables {
+		var exists bool
+		query := fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '%s')", table)
+		if err := db.Raw(query).Scan(&exists).Error; err != nil {
+			log.Printf("检查表 %s 失败: %v", table, err)
+			continue
+		}
+		if exists {
+			log.Printf("✅ 表存在: %s", table)
+		} else {
+			log.Printf("⚠️ 表不存在: %s", table)
+		}
+	}
+
+	log.Println("✅ 数据库状态检查完成")
 	return nil
 }
